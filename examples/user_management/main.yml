@@ -1,0 +1,36 @@
+- hosts: all
+  tasks:
+    - name: Manage user jsmith
+      user:
+        name: jsmith
+        comment: John Smith, default extraordinaire
+        uid: 10000
+        createhome: yes
+        group: jsmith
+        groups: sudo
+        password: $xyz123$fji$jhuiohsfuiohgeosui
+        shell: /bin/bash
+        state: present
+    - name: Manage key for jsmith
+      authorized_key:
+        user: jsmith
+        key: abc123
+        state: present
+
+# Ex-user
+    - name: Remove bsmith
+      user:
+        name: bsmith
+        comment: Barbara Smith, not the usual default
+        uid: 10001
+        createhome: yes
+        group: jsmith
+        groups: sudo
+        password: $xyz123$fji$jhuiohsfuiohgeosui
+        shell: /bin/bash
+        state: absent
+    - name: Manage key for bsmith
+      authorized_key:
+        user: bsmith
+        key: abc123
+        state: absent
