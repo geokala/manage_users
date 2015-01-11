@@ -119,7 +119,7 @@ class AnsibleUsers(object):
         passwd_hash = crypt.crypt(password, type_and_salt)
         return passwd_hash
 
-    def create_user(self, user, password, comment=None, sshkeys=None):
+    def create_user(self, user, password, comment=None, sshkeys=[]):
         """
             Add a new user to the playbook.
 
@@ -130,7 +130,7 @@ class AnsibleUsers(object):
             comment -- A comment to be added to this user's passwd entries.
                        (default: None)
             sshkeys -- List of SSH keys to add to authorized_keys for this
-                       user. (default: None)
+                       user. (default: No keys (empty list))
         """
         if user in self.get_users().keys():
             raise DuplicateUserError(user)
