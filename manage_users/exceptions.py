@@ -1,6 +1,3 @@
-from manage_users.exceptions import (DuplicateUserError, NoSuchUserError,
-                                     SSHKeyNotFoundError)
-
 class DuplicateUserError(Exception):
     """
         Raised when an attempt is made to create a user which already exists.
