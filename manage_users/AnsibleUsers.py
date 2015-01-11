@@ -1,7 +1,8 @@
 #! /usr/bin/env python3
 from collections import defaultdict
 import crypt
-from manage_users.exceptions import (DuplicateUserError, NoSuchUserError)
+from manage_users.exceptions import (DuplicateUserError, NoSuchUserError,
+                                     SSHKeyNotFoundError)
 import yaml
 
 
@@ -11,6 +12,12 @@ class AnsibleUsers(object):
 
         This playbook should be one entirely managed by this class.
     """
+
+    state_mapping = {
+        'present': True,
+        'absent': False,
+    }
+    playbook = None
 
     def __init__(self, playbook_path='test/example.yml', base_id=10000):
         """
@@ -23,7 +30,6 @@ class AnsibleUsers(object):
                        + 1, if there are existing users.
         """
         self.playbook_path = playbook_path
-        self.playbook = None
         self.next_id = base_id
 
     def load_playbook(self):
@@ -77,12 +83,25 @@ class AnsibleUsers(object):
         for task in playbook_tasks:
             if 'user' in task.keys():
                 user = task['user']
-                users[user['name']].update(user)
+
+                # Only add if we're not filtering
+                user_active = self.state_mapping[user['state']]
+                if user_active and include_active or \
+                   (not user_active) and include_inactive:
+                    users[user['name']].update(user)
             elif 'authorized_key' in task.keys():
                 key_details = task['authorized_key']
-                if 'sshkeys' not in users[user['name']].keys():
+
+                # Don't add the key if the user was filtered
+                if key_details['user'] not in users:
+                    continue
+
+                if 'sshkeys' not in users[key_details['user']].keys():
                     users[user['name']]['sshkeys'] = []
-                users[user['name']]['sshkeys'].append(key_details['key'])
+                users[user['name']]['sshkeys'].append({
+                    'key': key_details['key'],
+                    'state': self.state_mapping[key_details['state']],
+                })
 
         return users
 
@@ -193,6 +212,8 @@ class AnsibleUsers(object):
                 task['user'][attribute] = new_value
                 # We've found the user, we can stop now
                 break
+        # If we don't find the user, complain
+        raise NoSuchUserError(user)
 
     def change_password(self, user, password):
         """
@@ -203,9 +224,6 @@ class AnsibleUsers(object):
             password -- The new password for this user. This will be hashed
                         automatically as SHA512.
         """
-        if user not in self.get_users().keys():
-            raise NoSuchUserError(user)
-
         self._modify_user_attribute(
             user=user,
             attribute='password',
@@ -220,9 +238,6 @@ class AnsibleUsers(object):
             Keyword arguments:
             user -- The user to enable.
         """
-        if user not in self.get_users().keys():
-            raise NoSuchUserError(user)
-
         self._modify_user_attribute(
             user=user,
             attribute='state',
@@ -238,11 +253,64 @@ class AnsibleUsers(object):
             Keyword arguments:
             user -- The user to disable.
         """
-        if user not in self.get_users().keys():
-            raise NoSuchUserError(user)
-
         self._modify_user_attribute(
             user=user,
+            attribute='state',
+            new_value='absent',
+        )
+
+    def _modify_sshkey_attribute(self, user, target_key_id,
+                                 attribute, new_value):
+        """
+            Change a single attribute for one of a user's SSH keys.
+
+            Keyword arguments:
+            user -- The name of the user whose SSH key should be affected.
+            target_key_id -- The ID of the key to change for that user.
+            attribute -- The name of the attribute to change.
+            new_value -- The new value of the attribute.
+        """
+        for task in self.playbook[0]['tasks']:
+            if 'authorized_key' in task.keys() and \
+               task['authorized_key']['name'] == user:
+                # We found a key for this user- check it's the right one
+                # The task name must be in the form:
+                # 'Manage sshkey {count} for user {user}'
+                this_id = int(task['name'][14:].split()[0])
+                if this_id == target_key_id:
+                    task['authorized_key'][attribute] = new_value
+                    # We've found the key, we can stop now
+                    break
+        raise SSHKeyNotFoundError(user, target_key_id)
+
+    def enable_sshkey(self, user, key_id):
+        """
+            Enables a disabled SSH key for a user. This will allow logins for
+            that key again.
+
+            Keyword arguments:
+            user -- The name of the user whose SSH key should be affected.
+            key_id -- The ID of the key to be affected.
+        """
+        self._modify_sshkey_attribute(
+            user=user,
+            target_key_id=key_id,
+            attribute='state',
+            new_value='present',
+        )
+
+    def disable_sshkey(self, user, key_id):
+        """
+            Disables an SSH key for a user, preventing that key from being
+            used to log in.
+
+            Keyword arguments:
+            user -- The name of the user whose SSH key should be affected.
+            key_id -- The ID of the key to be affected.
+        """
+        self._modify_sshkey_attribute(
+            user=user,
+            target_key_id=key_id,
             attribute='state',
             new_value='absent',
         )
