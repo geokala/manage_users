@@ -141,7 +141,7 @@ class AnsibleUsers(object):
             'state': 'present',
         }
 
-        user = {
+        user_settings = {
             'name': user,
             'password': self._hash_password(password),
             'group': user,
@@ -160,7 +160,7 @@ class AnsibleUsers(object):
         })
         self.playbook[0]['tasks'].append({
             'name': 'Manage user for {user}'.format(user=user),
-            'user': user,
+            'user': user_settings,
         })
 
         for key in sshkeys:
