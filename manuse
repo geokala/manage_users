@@ -17,6 +17,9 @@ class ManageUsersCLI(object):
             Keyword arguments:
             config -- Path to the config file for the CLI.
         """
+        # Default program name, will be overridden when a command is run
+        self.program_name = 'manuse'
+
         self.commands = {
             'list': {
                 'func': self.list_users,
@@ -80,7 +83,7 @@ class ManageUsersCLI(object):
     def configure(self):
         pass
 
-    def print_usage(self, subcommand=None):
+    def print_usage(self, output=sys.stdout, subcommand=None):
         """
             Provide usage for the CLI or a given subcommand.
 
@@ -88,25 +91,23 @@ class ManageUsersCLI(object):
             subcommand -- Help for a given subcommand.
         """
         # TODO: Actually implement this
-        print('Here is how to use this.')
+        output.write('Here is how to use this.\n')
 
+    def run_command(self, args):
+        """
+            Run a command based on args passed from the command line.
 
-def select_action(arg):
-    """
-        Determine which action to use.
-    """
+            Keyword arguments:
+            args -- Arguments passed from the command line (sys.argv).
+        """
+        if len(args) < 2:
+            sys.stderr.write('Not enough arguments.\n')
+            self.print_usage(output=sys.stderr)
+            sys.exit(1)
 
-    actions = {
-    }
-    actions = actions
+        self.program_name = args[0]
 
-    return print
-
-
-def main(args):
-    print('#' + str(args) + '#')
-    action = select_action(args[0])
-    action(args[1:])
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    cli = ManageUsersCLI()
+    cli.run_command(sys.argv)
