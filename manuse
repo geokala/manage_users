@@ -23,6 +23,7 @@ class ManageUsersCLI(object):
         self.commands = {
             'list': {
                 'func': self.list_users,
+                'help': 'List users.',
                 'arguments': {
                     'example': {
                         'help': 'This does stuff.',
@@ -32,6 +33,7 @@ class ManageUsersCLI(object):
             },
             'create': {
                 'func': self.create_user,
+                'help': 'Create a new user.',
                 'arguments': {
                     'example': {
                         'help': 'This does stuff.',
@@ -41,6 +43,7 @@ class ManageUsersCLI(object):
             },
             'sshkey': {
                 'func': self.sshkey,
+                'help': 'Manage SSH keys for a user.',
                 'arguments': {
                     'example': {
                         'help': 'This does stuff.',
@@ -50,6 +53,7 @@ class ManageUsersCLI(object):
             },
             'modify': {
                 'func': self.modify_user,
+                'help': 'Modify a user, including disabling/enabling.',
                 'arguments': {
                     'example': {
                         'help': 'This does stuff.',
@@ -59,6 +63,7 @@ class ManageUsersCLI(object):
             },
             'configure': {
                 'func': self.configure,
+                'help': 'Configure the behaviour of this tool.',
                 'arguments': {
                     'example': {
                         'help': 'This does stuff.',
@@ -83,15 +88,36 @@ class ManageUsersCLI(object):
     def configure(self):
         pass
 
-    def print_usage(self, output=sys.stdout, subcommand=None):
+    def print_usage(self, output_stream=sys.stdout, subcommand=None):
         """
             Provide usage for the CLI or a given subcommand.
 
             Keyword arguments:
             subcommand -- Help for a given subcommand.
         """
-        # TODO: Actually implement this
-        output.write('Here is how to use this.\n')
+        if subcommand is None:
+            commands_help = ''.join([
+                '{command} -- {help}\n'.format(
+                    command=command, help=details['help']
+                )
+                for command, details in self.commands.items()
+            ])
+            output = (
+                'Usage:\n'
+                '{progname} <command>\n'
+                '\n'
+                'Get additional help on commands with:\n'
+                '{progname} <command> help\n'
+                '\n'
+                'Available commands:\n'
+                '{commands}'
+            )
+            output = output.format(
+                progname=self.program_name,
+                commands=commands_help,
+            )
+            output_stream.write(output)
+        # TODO: Implement for subcommands
 
     def run_command(self, args):
         """
@@ -100,12 +126,12 @@ class ManageUsersCLI(object):
             Keyword arguments:
             args -- Arguments passed from the command line (sys.argv).
         """
-        if len(args) < 2:
-            sys.stderr.write('Not enough arguments.\n')
-            self.print_usage(output=sys.stderr)
-            sys.exit(1)
-
         self.program_name = args[0]
+
+        if len(args) < 2:
+            sys.stderr.write('You must choose a command.\n\n')
+            self.print_usage(output_stream=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == '__main__':
