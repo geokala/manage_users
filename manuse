@@ -11,6 +11,8 @@ class ManageUsersCLI(object):
         Argparse would be nice to use, but is extremely clunky for
         subcommands.
     """
+    # TODO: Refactor the commands dict- make the arguments to the subcommands
+    # have funcs, and make the argument parsing work its way through the tree
 
     def __init__(self, config):
         """
@@ -24,7 +26,7 @@ class ManageUsersCLI(object):
 
         self.config_loaded = False
         self.config_path = config
-        self.config = None
+        self.config = configparser.ConfigParser()
 
         self.commands = {
             'list': {
@@ -92,8 +94,45 @@ class ManageUsersCLI(object):
     def modify_user(self):
         pass
 
-    def configure(self):
-        pass
+    def configure(self, args):
+        """
+            Configure this application- see the class variable
+            "commands['configure']['arguments']" for details of parameters.
+
+            Keyword arguments:
+            args -- Arguments to determine behaviour of this command.
+                    This should be the command line args with the first two
+                    elements removed (sys.argv[2:]).
+        """
+        if len(args) == 0:
+            sys.stderr.write(
+                'This command requires arguments. See below.\n\n'
+            )
+            self.print_usage(output_stream=sys.stderr, subcommand='configure')
+            sys.exit(1)
+
+        config_changed = False
+
+        if args[0] == 'playbook':
+            if len(args) != 2:
+                sys.stderr.write('You must provide only a playbook path.\n\n')
+                self.print_usage(output_stream=sys.stderr,
+                                 subcommand='configure')
+                sys.exit(1)
+            else:
+                if 'ansible' not in self.config.sections():
+                    self.config.add_section('ansible')
+                self.config.set('ansible', 'playbook_path', args[1])
+                config_changed = True
+        else:
+            # TODO: Add configure show command
+            sys.stderr.write('Argument {arg} not recognised.\n\n'.format(
+                             args[0]))
+            self.print_usage(output_stream=sys.stderr, subcommand='configure')
+            sys.exit(1)
+
+        if config_changed:
+            self.save_config()
 
     def print_usage(self, output_stream=sys.stdout, subcommand=None):
         """
@@ -124,8 +163,7 @@ class ManageUsersCLI(object):
                 commands=commands_help,
             )
             output_stream.write(output)
-
-        if subcommand in self.commands:
+        elif subcommand in self.commands:
             command = self.commands[subcommand]
             arguments_help = ''.join([
                 ('{argument} -- {help}\n'
@@ -141,12 +179,15 @@ class ManageUsersCLI(object):
                 'Usage:\n'
                 '{progname} {subcommand} <argument> <parameter>\n'
                 '\n'
+                '{description}\n'
+                '\n'
                 'Available arguments:\n'
                 '{arguments}'
             )
             output = output.format(
                 progname=self.program_name,
                 subcommand=subcommand,
+                description=command['help'],
                 arguments=arguments_help,
             )
             output_stream.write(output)
@@ -156,11 +197,17 @@ class ManageUsersCLI(object):
             ))
             self.print_usage(output_stream=output_stream)
 
+    def save_config(self):
+        """
+            Save the config for this application.
+        """
+        with open(self.config_path, 'w') as config_handle:
+            self.config.write(config_handle)
+
     def load_config(self):
         """
             Load the config for this application.
         """
-        self.config = configparser.ConfigParser()
         try:
             with open(self.config_path) as config_handle:
                 self.config.readfp(config_handle)
@@ -192,12 +239,20 @@ class ManageUsersCLI(object):
             sys.exit(1)
 
         try:
-            return self.commands[args[1]]
+            command = self.commands[args[1]]
+            if len(args) > 2 and args[2].strip() == 'help':
+                self.print_usage(output_stream=sys.stdout,
+                                 subcommand=args[1])
+                sys.exit(0)
         except KeyError:
             if args[1].strip() != 'help':
                 output = sys.stderr
+            else:
+                output = sys.stdout
             self.print_usage(output_stream=output)
             sys.exit(1)
+
+        return command['func'](args[2:])
 
 
 if __name__ == '__main__':
