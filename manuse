@@ -78,6 +78,11 @@ class ManageUsersCLI(object):
                                  ' will be created if it does not exist.'),
                         'values': ['A valid path which is writable.'],
                     },
+                    'baseid': {
+                        'help': ('Set the starting UID/GID for users and'
+                                 'groups.'),
+                        'values': ['A valid integer.'],
+                    }
                 },
             },
         }
@@ -119,11 +124,30 @@ class ManageUsersCLI(object):
                 self.print_usage(output_stream=sys.stderr,
                                  subcommand='configure')
                 sys.exit(1)
-            else:
-                if 'ansible' not in self.config.sections():
-                    self.config.add_section('ansible')
-                self.config.set('ansible', 'playbook_path', args[1])
+            # TODO: Test that the path is writable
+            if 'ansible' not in self.config.sections():
+                self.config.add_section('ansible')
+            self.config.set('ansible', 'playbook_path', args[1])
+            config_changed = True
+        elif args[0] == 'baseid':
+            if len(args) != 2:
+                sys.stderr.write('You must provide only a base ID.\n\n')
+                self.print_usage(output_stream=sys.stderr,
+                                 subcommand='configure')
+                sys.exit(1)
+            try:
+                int(args[1])
+                # TODO: Make this a bit more restrictive and update help
+                if 'general' not in self.config.sections():
+                    self.config.add_section('general')
+                self.config.set('general', 'base_id', args[1])
                 config_changed = True
+            except ValueError:
+                sys.stderr.write('{base_id} is not an integer.\n\n'.format(
+                                 base_id=args[1]))
+                self.print_usage(output_stream=sys.stderr,
+                                 subcommand='configure')
+                sys.exit(1)
         else:
             # TODO: Add configure show command
             sys.stderr.write('Argument {arg} not recognised.\n\n'.format(
@@ -204,7 +228,7 @@ class ManageUsersCLI(object):
         with open(self.config_path, 'w') as config_handle:
             self.config.write(config_handle)
 
-    def load_config(self):
+    def load_config(self, abort_on_error=True):
         """
             Load the config for this application.
         """
@@ -213,13 +237,15 @@ class ManageUsersCLI(object):
                 self.config.readfp(config_handle)
             self.config_parsed = True
         except FileNotFoundError:
-            sys.stderr.write(
-                ('Could not find config file in {config_path}\n'
-                 'Please run configuration before use:\n\n').format(
-                    config_path=self.config_path
+            if abort_on_error:
+                sys.stderr.write(
+                    ('Could not find config file in {config_path}\n'
+                     'Please run configuration before use:\n\n').format(
+                        config_path=self.config_path
+                    )
                 )
-            )
-            self.print_usage(output_stream=sys.stderr, subcommand='configure')
+                self.print_usage(output_stream=sys.stderr,
+                                 subcommand='configure')
 
     def run_command(self, args):
         """
@@ -228,15 +254,19 @@ class ManageUsersCLI(object):
             Keyword arguments:
             args -- Arguments passed from the command line (sys.argv).
         """
-        if args[1].strip() != 'configure' and not self.config_loaded:
-            self.load_config()
-
         self.program_name = args[0]
 
         if len(args) < 2:
             sys.stderr.write('You must choose a command.\n\n')
             self.print_usage(output_stream=sys.stderr)
             sys.exit(1)
+
+        if not self.config_loaded:
+            if args[1].strip() == 'configure':
+                abort_on_error = False
+            else:
+                abort_on_error = True
+            self.load_config(abort_on_error)
 
         try:
             command = self.commands[args[1]]
