@@ -71,9 +71,10 @@ class ManageUsersCLI(object):
                 'func': self.configure,
                 'help': 'Configure the behaviour of this tool.',
                 'arguments': {
-                    'example': {
-                        'help': 'This does stuff.',
-                        'values': ['a', 'b', 'c'],
+                    'playbook': {
+                        'help': ('Set the path to the playbook. This playbook'
+                                 ' will be created if it does not exist.'),
+                        'values': ['A valid path which is writable.'],
                     },
                 },
             },
@@ -123,7 +124,37 @@ class ManageUsersCLI(object):
                 commands=commands_help,
             )
             output_stream.write(output)
-        # TODO: Implement for subcommands
+
+        if subcommand in self.commands:
+            command = self.commands[subcommand]
+            arguments_help = ''.join([
+                ('{argument} -- {help}\n'
+                 '{argindent}    Valid parameters: {vals}\n').format(
+                    argument=argument,
+                    argindent=' ' * len(argument),
+                    help=details['help'],
+                    vals=','.join(details['values']),
+                )
+                for argument, details in command['arguments'].items()
+            ])
+            output = (
+                'Usage:\n'
+                '{progname} {subcommand} <argument> <parameter>\n'
+                '\n'
+                'Available arguments:\n'
+                '{arguments}'
+            )
+            output = output.format(
+                progname=self.program_name,
+                subcommand=subcommand,
+                arguments=arguments_help,
+            )
+            output_stream.write(output)
+        else:
+            output_stream.write('Command {subcommand} not found.\n\n'.format(
+                subcommand=subcommand
+            ))
+            self.print_usage(output_stream=output_stream)
 
     def load_config(self):
         """
@@ -132,7 +163,7 @@ class ManageUsersCLI(object):
         self.config = configparser.ConfigParser()
         try:
             with open(self.config_path) as config_handle:
-                config.readfp(config_handle)
+                self.config.readfp(config_handle)
             self.config_parsed = True
         except FileNotFoundError:
             sys.stderr.write(
@@ -157,6 +188,14 @@ class ManageUsersCLI(object):
         if len(args) < 2:
             sys.stderr.write('You must choose a command.\n\n')
             self.print_usage(output_stream=sys.stderr)
+            sys.exit(1)
+
+        try:
+            return self.commands[args[1]]
+        except KeyError:
+            if args[1].strip() != 'help':
+                output = sys.stderr
+            self.print_usage(output_stream=output)
             sys.exit(1)
 
 
