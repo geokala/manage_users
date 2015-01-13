@@ -167,7 +167,8 @@ class ManageUsersCLI(object):
             self.config_parsed = True
         except FileNotFoundError:
             sys.stderr.write(
-                'Could not find config file in {config_path}\n\n'.format(
+                ('Could not find config file in {config_path}\n'
+                 'Please run configuration before use:\n\n').format(
                     config_path=self.config_path
                 )
             )
@@ -180,7 +181,7 @@ class ManageUsersCLI(object):
             Keyword arguments:
             args -- Arguments passed from the command line (sys.argv).
         """
-        if not self.config_loaded:
+        if args[1].strip() != 'configure' and not self.config_loaded:
             self.load_config()
 
         self.program_name = args[0]
