@@ -1,0 +1,88 @@
+#! /usr/bin/env python3
+import argparse
+import configparser
+import os
+import sys
+
+
+def main(args, config_path):
+    """
+        List users in the configuration management. By default this will show
+        enabled users and hide disabled users.
+
+        Keyword arguments:
+        args -- A list of arguments from the command line with the program
+                name removed (sys.argv[1:]).
+        config_path -- The path to the manage_users config file.
+    """
+    parser = argparse.ArgumentParser(
+        description='Show users controlled by this application.',
+    )
+
+    parser.add_argument(
+        '-a', '--ansible-playbook-path',
+        help='Set the path to the ansible playbook.',
+    )
+    parser.add_argument(
+        '-b', '--base-id',
+        help=('Set the base ID for users/groups created by this application.'
+              ' This must be between 5000 and 50000.'),
+        type=int,
+    )
+    parser.add_argument(
+        '-s', '--show-config',
+        help='Show the configuration after any changes are made.',
+        action='store_true',
+        default=False,
+    )
+
+    args = parser.parse_args(args)
+
+    config = configparser.ConfigParser()
+    try:
+        with open(config_path) as config_handle:
+            config.readfp(config_handle)
+    except FileNotFoundError:
+        print(
+            'Existing configuration file not found in {config_path}.'.format(
+                config_path=config_path,
+            )
+        )
+        print('Modifications will be stored in a new file.')
+
+    # Make sure we have all expected sections of the config
+    for section in ('ansible', 'general'):
+        if section not in config.sections():
+            config.add_section(section)
+
+    if args.ansible_playbook_path is not None:
+        # If they set an invalid path, they won't be able to use it properly
+        # later. However, even if we check the path is valid and writeable
+        # now, it may not be later, so we'll deal with that case as it arises.
+        config.set('ansible', 'playbook_path', args.ansible_playbook_path)
+
+    if args.base_id is not None:
+        # Arbitrary limits to avoid crazy values
+        if args.base_id > 50000 or args.base_id < 5000:
+            sys.stderr.write('base_id must be between 5000 and 50000\n')
+        else:
+            config.set('general', 'base_id', str(args.base_id))
+
+    # We've made any necessary changes, save the file
+    with open(config_path, 'w') as config_handle:
+        config.write(config_handle)
+
+    # We could do clever things with dict parsing, etc, here
+    # But that would be clever for the sake of it, let's just print the config
+    if args.show_config:
+        with open(config_path) as config_handle:
+            config = config_handle.readlines()
+        for line in config:
+            print(line.rstrip())
+
+if __name__ == '__main__':
+    config_path = os.path.join(
+        os.path.expanduser('~'),
+        '.manage_users.conf'
+    )
+    main(sys.argv[1:], config_path)
