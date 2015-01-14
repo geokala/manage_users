@@ -97,30 +97,29 @@ def main(args, config_path):
             action = user_manager.disable_sshkey
 
         for key in keys:
-            not_found = False
+            found = True
             try:
                 key = int(key)
-                # The list is zero indexed, but we show it as one indexed
-                key -= 1
             except ValueError:
                 # This is an SSH key. Try to find it
-                try:
-                    key = user_sshkeys.index(key)
-                except ValueError:
-                    not_found = True
+                found = False
+                for possible_key in range(0, len(user_sshkeys)):
+                    if user_sshkeys[possible_key]['key'] == key:
+                        # SSH key indexes are one indexed effectively
+                        key = possible_key + 1
+                        found = True
 
-            if not_found and operation == 'enable':
+            if not found and operation == 'enable':
                 user_manager.add_sshkey(args.username, key)
-                not_found = False
-            else:
+                found = True
+            elif found:
                 try:
                     action(args.username, key)
                 except SSHKeyNotFoundError:
-                    key += 1
-                    not_found = True
+                    found = False
 
-            if not_found:
-                sys.stderr.write('Key {key} not found.\n'.format(key=key))
+            if not found:
+                 sys.stderr.write('Key {key} not found.\n'.format(key=key))
 
     # Save the changes
     user_manager.save_playbook()
