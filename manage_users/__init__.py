@@ -4,3 +4,16 @@ from manage_users.exceptions import (  # noqa
     NoSuchUserError,
     SSHKeyNotFoundError,
 )
+
+__author__ = 'geokala- https://github.com/geokala'
+__version__ = '1.0.0'
+"""
+    This module is designed to facilitate management of users through a
+    configuration management system when centralised account management (such
+    as LDAP) is not implemented.
+
+    It is intended to be used through the 'manuse' utility that is deployed
+    with it.
+
+    See LICENSE file on github for license details.
+"""
