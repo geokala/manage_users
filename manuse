@@ -11,9 +11,6 @@ class ManageUsersCLI(object):
         Argparse would be nice to use, but is extremely clunky for
         subcommands.
     """
-    # TODO: Refactor the commands dict- make the arguments to the subcommands
-    # have funcs, and make the argument parsing work its way through the tree
-
     def __init__(self, config):
         """
             Initialise the user management CLI.
@@ -29,16 +26,6 @@ class ManageUsersCLI(object):
         self.config = configparser.ConfigParser()
 
         self.commands = {
-            'list': {
-                'func': self.list_users,
-                'help': 'List users.',
-                'arguments': {
-                    'example': {
-                        'help': 'This does stuff.',
-                        'values': ['a', 'b', 'c'],
-                    },
-                },
-            },
             'create': {
                 'func': self.create_user,
                 'help': 'Create a new user.',
@@ -69,26 +56,7 @@ class ManageUsersCLI(object):
                     },
                 },
             },
-            'configure': {
-                'func': self.configure,
-                'help': 'Configure the behaviour of this tool.',
-                'arguments': {
-                    'playbook': {
-                        'help': ('Set the path to the playbook. This playbook'
-                                 ' will be created if it does not exist.'),
-                        'values': ['A valid path which is writable.'],
-                    },
-                    'baseid': {
-                        'help': ('Set the starting UID/GID for users and'
-                                 'groups.'),
-                        'values': ['A valid integer.'],
-                    }
-                },
-            },
         }
-
-    def list_users(self):
-        pass
 
     def create_user(self):
         pass
@@ -98,154 +66,6 @@ class ManageUsersCLI(object):
 
     def modify_user(self):
         pass
-
-    def configure(self, args):
-        """
-            Configure this application- see the class variable
-            "commands['configure']['arguments']" for details of parameters.
-
-            Keyword arguments:
-            args -- Arguments to determine behaviour of this command.
-                    This should be the command line args with the first two
-                    elements removed (sys.argv[2:]).
-        """
-        if len(args) == 0:
-            sys.stderr.write(
-                'This command requires arguments. See below.\n\n'
-            )
-            self.print_usage(output_stream=sys.stderr, subcommand='configure')
-            sys.exit(1)
-
-        config_changed = False
-
-        if args[0] == 'playbook':
-            if len(args) != 2:
-                sys.stderr.write('You must provide only a playbook path.\n\n')
-                self.print_usage(output_stream=sys.stderr,
-                                 subcommand='configure')
-                sys.exit(1)
-            # TODO: Test that the path is writable
-            if 'ansible' not in self.config.sections():
-                self.config.add_section('ansible')
-            self.config.set('ansible', 'playbook_path', args[1])
-            config_changed = True
-        elif args[0] == 'baseid':
-            if len(args) != 2:
-                sys.stderr.write('You must provide only a base ID.\n\n')
-                self.print_usage(output_stream=sys.stderr,
-                                 subcommand='configure')
-                sys.exit(1)
-            try:
-                int(args[1])
-                # TODO: Make this a bit more restrictive and update help
-                if 'general' not in self.config.sections():
-                    self.config.add_section('general')
-                self.config.set('general', 'base_id', args[1])
-                config_changed = True
-            except ValueError:
-                sys.stderr.write('{base_id} is not an integer.\n\n'.format(
-                                 base_id=args[1]))
-                self.print_usage(output_stream=sys.stderr,
-                                 subcommand='configure')
-                sys.exit(1)
-        else:
-            # TODO: Add configure show command
-            sys.stderr.write('Argument {arg} not recognised.\n\n'.format(
-                             args[0]))
-            self.print_usage(output_stream=sys.stderr, subcommand='configure')
-            sys.exit(1)
-
-        if config_changed:
-            self.save_config()
-
-    def print_usage(self, output_stream=sys.stdout, subcommand=None):
-        """
-            Provide usage for the CLI or a given subcommand.
-
-            Keyword arguments:
-            subcommand -- Help for a given subcommand.
-        """
-        if subcommand is None:
-            commands_help = ''.join([
-                '{command} -- {help}\n'.format(
-                    command=command, help=details['help']
-                )
-                for command, details in self.commands.items()
-            ])
-            output = (
-                'Usage:\n'
-                '{progname} <command>\n'
-                '\n'
-                'Get additional help on commands with:\n'
-                '{progname} <command> help\n'
-                '\n'
-                'Available commands:\n'
-                '{commands}'
-            )
-            output = output.format(
-                progname=self.program_name,
-                commands=commands_help,
-            )
-            output_stream.write(output)
-        elif subcommand in self.commands:
-            command = self.commands[subcommand]
-            arguments_help = ''.join([
-                ('{argument} -- {help}\n'
-                 '{argindent}    Valid parameters: {vals}\n').format(
-                    argument=argument,
-                    argindent=' ' * len(argument),
-                    help=details['help'],
-                    vals=','.join(details['values']),
-                )
-                for argument, details in command['arguments'].items()
-            ])
-            output = (
-                'Usage:\n'
-                '{progname} {subcommand} <argument> <parameter>\n'
-                '\n'
-                '{description}\n'
-                '\n'
-                'Available arguments:\n'
-                '{arguments}'
-            )
-            output = output.format(
-                progname=self.program_name,
-                subcommand=subcommand,
-                description=command['help'],
-                arguments=arguments_help,
-            )
-            output_stream.write(output)
-        else:
-            output_stream.write('Command {subcommand} not found.\n\n'.format(
-                subcommand=subcommand
-            ))
-            self.print_usage(output_stream=output_stream)
-
-    def save_config(self):
-        """
-            Save the config for this application.
-        """
-        with open(self.config_path, 'w') as config_handle:
-            self.config.write(config_handle)
-
-    def load_config(self, abort_on_error=True):
-        """
-            Load the config for this application.
-        """
-        try:
-            with open(self.config_path) as config_handle:
-                self.config.readfp(config_handle)
-            self.config_parsed = True
-        except FileNotFoundError:
-            if abort_on_error:
-                sys.stderr.write(
-                    ('Could not find config file in {config_path}\n'
-                     'Please run configuration before use:\n\n').format(
-                        config_path=self.config_path
-                    )
-                )
-                self.print_usage(output_stream=sys.stderr,
-                                 subcommand='configure')
 
     def run_command(self, args):
         """
