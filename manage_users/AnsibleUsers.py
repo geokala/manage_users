@@ -88,7 +88,11 @@ class AnsibleUsers(object):
                 user_active = self.state_mapping[user['state']]
                 if user_active and include_active or \
                    (not user_active) and include_inactive:
+
                     users[user['name']].update(user)
+                    users[user['name']]['enabled'] = self.state_mapping[
+                        users[user['name']]['state']
+                    ]
             elif 'authorized_key' in task.keys():
                 key_details = task['authorized_key']
 
@@ -100,7 +104,7 @@ class AnsibleUsers(object):
                     users[user['name']]['sshkeys'] = []
                 users[user['name']]['sshkeys'].append({
                     'key': key_details['key'],
-                    'state': self.state_mapping[key_details['state']],
+                    'enabled': self.state_mapping[key_details['state']],
                 })
 
         return users
