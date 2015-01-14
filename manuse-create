@@ -32,8 +32,8 @@ def main(args, config_path):
     )
     parser.add_argument(
         '-s', '--sshkey',
-        help='Add an authorised SSH key for this user.'
-             ' This should be the public key.',
+        help='Add one or more authorised SSH keys for this user.'
+             ' These should be the public keys.',
         nargs='+',
     )
 
