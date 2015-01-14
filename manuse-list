@@ -110,8 +110,13 @@ def main(args, config_path):
                     else:
                         print('  SSH keys:')
                         for index in range(0, len(details['sshkeys'])):
-                            print('    {index}: {key}'.format(
+                            if details['sshkeys'][index]['enabled']:
+                                state_string = ''
+                            else:
+                                state_string = ' <DISABLED>'
+                            print('    {index}{state}: {key}'.format(
                                 index=index + 1,
+                                state=state_string,
                                 key=details['sshkeys'][index]['key'],
                             ))
 
