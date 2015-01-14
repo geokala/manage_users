@@ -102,8 +102,6 @@ def main(args, config_path):
                 key = int(key)
                 # The list is zero indexed, but we show it as one indexed
                 key -= 1
-            except SSHKeyNotFoundError:
-                not_found = True
             except ValueError:
                 # This is an SSH key. Try to find it
                 try:
@@ -111,14 +109,18 @@ def main(args, config_path):
                 except ValueError:
                     not_found = True
 
-            if not_found:
-                if operation == 'enable':
-                    user_manager.add_sshkey(args.username, key)
-                else:
-                    sys.stderr.write('Key {key} not found.\n'.format(key=key))
+            if not_found and operation == 'enable':
+                user_manager.add_sshkey(args.username, key)
+                not_found = False
             else:
-                action(args.username, key)
-        disable_sshkeys
+                try:
+                    action(args.username, key)
+                except SSHKeyNotFoundError:
+                    key += 1
+                    not_found = True
+
+            if not_found:
+                sys.stderr.write('Key {key} not found.\n'.format(key=key))
 
     # Save the changes
     user_manager.save_playbook()
