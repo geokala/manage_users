@@ -111,8 +111,8 @@ def main(args, config_path):
                         print('  SSH keys:')
                         for index in range(0, len(details['sshkeys'])):
                             print('    {index}: {key}'.format(
-                                index=index,
-                                key=details['sshkeys'][index],
+                                index=index + 1,
+                                key=details['sshkeys'][index]['key'],
                             ))
 
 if __name__ == '__main__':
