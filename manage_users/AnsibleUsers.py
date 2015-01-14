@@ -276,7 +276,7 @@ class AnsibleUsers(object):
         """
         for task in self.playbook[0]['tasks']:
             if 'authorized_key' in task.keys() and \
-               task['authorized_key']['name'] == user:
+               task['authorized_key']['user'] == user:
                 # We found a key for this user- check it's the right one
                 # The task name must be in the form:
                 # 'Manage sshkey {count} for user {user}'
@@ -284,7 +284,7 @@ class AnsibleUsers(object):
                 if this_id == target_key_id:
                     task['authorized_key'][attribute] = new_value
                     # We've found the key, we can stop now
-                    break
+                    return
         raise SSHKeyNotFoundError(user, target_key_id)
 
     def enable_sshkey(self, user, key_id):
