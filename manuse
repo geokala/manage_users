@@ -26,16 +26,6 @@ class ManageUsersCLI(object):
         self.config = configparser.ConfigParser()
 
         self.commands = {
-            'create': {
-                'func': self.create_user,
-                'help': 'Create a new user.',
-                'arguments': {
-                    'example': {
-                        'help': 'This does stuff.',
-                        'values': ['a', 'b', 'c'],
-                    },
-                },
-            },
             'sshkey': {
                 'func': self.sshkey,
                 'help': 'Manage SSH keys for a user.',
