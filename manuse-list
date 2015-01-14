@@ -20,6 +20,7 @@ def main(args, config_path):
     """
     parser = argparse.ArgumentParser(
         description='Show users controlled by this application.',
+        prog='manuse list',
     )
 
     parser.add_argument(

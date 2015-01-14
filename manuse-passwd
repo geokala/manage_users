@@ -20,6 +20,7 @@ def main(args, config_path):
         description='Change the password of a user in the configuration'
                     ' management system. You will be prompted for the new'
                     ' password.',
+        prog='manuse passwd',
     )
 
     parser.add_argument(

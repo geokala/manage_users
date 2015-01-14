@@ -19,6 +19,7 @@ def main(args, config_path):
     parser = argparse.ArgumentParser(
         description='Create a user in the configuration management.'
                     ' You will be prompted for a password.',
+        prog='manuse create',
     )
 
     parser.add_argument(

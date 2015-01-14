@@ -17,6 +17,7 @@ def main(args, config_path):
     """
     parser = argparse.ArgumentParser(
         description="Modify a user's SSH keys.",
+        prog='manuse sshkey',
     )
 
     parser.add_argument(
@@ -119,7 +120,7 @@ def main(args, config_path):
                     found = False
 
             if not found:
-                 sys.stderr.write('Key {key} not found.\n'.format(key=key))
+                sys.stderr.write('Key {key} not found.\n'.format(key=key))
 
     # Save the changes
     user_manager.save_playbook()

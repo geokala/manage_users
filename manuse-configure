@@ -18,6 +18,7 @@ def main(args, config_path):
     parser = argparse.ArgumentParser(
         description='Configure user management tool for configuration'
                     ' management.',
+        prog='manuse configure',
     )
 
     parser.add_argument(
