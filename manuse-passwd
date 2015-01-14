@@ -1,0 +1,100 @@
+#! /usr/bin/env python3
+import argparse
+import configparser
+from getpass import getpass
+from manage_users import AnsibleUsers, NoSuchUserError
+import os
+import sys
+
+
+def main(args, config_path):
+    """
+        Change the password of a user in the configuration management system.
+
+        Keyword arguments:
+        args -- A list of arguments from the command line with the program
+                name removed (sys.argv[1:]).
+        config_path -- The path to the manage_users config file.
+    """
+    parser = argparse.ArgumentParser(
+        description='Change the password of a user in the configuration'
+                    ' management system. You will be prompted for the new'
+                    ' password.',
+    )
+
+    parser.add_argument(
+        '-u', '--username',
+        help="The name of the user whose password needs changing.",
+        required=True,
+    )
+
+    args = parser.parse_args(args)
+
+    config = configparser.ConfigParser()
+    try:
+        with open(config_path) as config_handle:
+            config.readfp(config_handle)
+    except FileNotFoundError:
+        sys.stderr.write(
+            ('Could not find config file in {config_path}\n'
+             'Please run configuration utility before use:\n').format(
+                config_path=config_path
+            )
+        )
+        sys.exit(1)
+
+    # Find out where the playbook is
+    playbook_path = config.get('ansible', 'playbook_path')
+
+    if playbook_path is None:
+        sys.stderr.write(
+            ('Could not find playbook path in configuration.\n'
+             'Please run configuration utility to set playbook path.\n')
+        )
+        sys.exit(1)
+
+    # Get the base ID or use a default
+    base_id = int(config.get('general', 'base_id')) or 10000
+
+    user_manager = AnsibleUsers(playbook_path=playbook_path,
+                                base_id=base_id)
+    user_manager.load_playbook()
+
+    # We need to get a password- it'll be hashed by the user management lib
+    print('Please enter the new password for the user.')
+    print('This password will automatically be hashed.')
+    password = ''
+    while password == '':
+        password = getpass(
+            'Enter new password for {user}:'.format(user=args.username)
+        )
+        if password == '':
+            sys.stderr.write('Password cannot be empty.\n')
+    confirm_password = ''
+    while password != confirm_password:
+        confirm_password = getpass(
+            'Confirm new password:',
+        )
+        if password != confirm_password:
+            sys.stderr.write('Confirmation does not match.\n')
+
+    try:
+        user_manager.change_password(
+            user=args.username,
+            password=password,
+        )
+        user_manager.save_playbook()
+    except NoSuchUserError:
+        sys.stderr.write(
+            'User {user} does not exist, doing nothing.\n'.format(
+                user=args.username,
+            )
+        )
+        sys.exit(1)
+
+if __name__ == '__main__':
+    config_path = os.path.join(
+        os.path.expanduser('~'),
+        '.manage_users.conf'
+    )
+    main(sys.argv[1:], config_path)
