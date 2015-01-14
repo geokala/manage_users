@@ -1,0 +1,117 @@
+#! /usr/bin/env python3
+import argparse
+import configparser
+from getpass import getpass
+from manage_users import AnsibleUsers, DuplicateUserError
+import os
+import sys
+
+
+def main(args, config_path):
+    """
+        Create a user in the configuration management system.
+
+        Keyword arguments:
+        args -- A list of arguments from the command line with the program
+                name removed (sys.argv[1:]).
+        config_path -- The path to the manage_users config file.
+    """
+    parser = argparse.ArgumentParser(
+        description='Create a user in the configuration management.'
+                    ' You will be prompted for a password.',
+    )
+
+    parser.add_argument(
+        '-u', '--username',
+        help="The new user's username.",
+        required=True,
+    )
+    parser.add_argument(
+        '-c', '--comment',
+        help='Comment for this user account.',
+    )
+    parser.add_argument(
+        '-s', '--sshkey',
+        help='Add an authorised SSH key for this user.'
+             ' This should be the public key.',
+        nargs='+',
+    )
+
+    args = parser.parse_args(args)
+
+    config = configparser.ConfigParser()
+    try:
+        with open(config_path) as config_handle:
+            config.readfp(config_handle)
+    except FileNotFoundError:
+        sys.stderr.write(
+            ('Could not find config file in {config_path}\n'
+             'Please run configuration utility before use:\n').format(
+                config_path=config_path
+            )
+        )
+        sys.exit(1)
+
+    # Find out where the playbook is
+    playbook_path = config.get('ansible', 'playbook_path')
+
+    if playbook_path is None:
+        sys.stderr.write(
+            ('Could not find playbook path in configuration.\n'
+             'Please run configuration utility to set playbook path.\n')
+        )
+        sys.exit(1)
+
+    # Get the base ID or use a default
+    base_id = int(config.get('general', 'base_id')) or 10000
+
+    user_manager = AnsibleUsers(playbook_path=playbook_path,
+                                base_id=base_id)
+    user_manager.load_playbook()
+
+    # Make sure we have a usable value for sshkeys
+    if args.sshkey is None:
+        sshkeys = []
+    else:
+        sshkeys = args.sshkey
+
+    # We need to get a password- it'll be hashed by the user management lib
+    print('Please enter a password for the new user.')
+    print('This password will automatically be hashed.')
+    password = ''
+    while password == '':
+        password = getpass(
+            'Enter new password for {user}:'.format(user=args.username)
+        )
+        if password == '':
+            sys.stderr.write('Password cannot be empty.\n')
+    confirm_password = ''
+    while password != confirm_password:
+        confirm_password = getpass(
+            'Confirm new password:',
+        )
+        if password != confirm_password:
+            sys.stderr.write('Confirmation does not match.\n')
+
+    try:
+        user_manager.create_user(
+            user=args.username,
+            password=password,
+            comment=args.comment,
+            sshkeys=sshkeys
+        )
+        user_manager.save_playbook()
+    except DuplicateUserError:
+        sys.stderr.write(
+            'User {user} already exists, doing nothing.\n'.format(
+                user=args.username,
+            )
+        )
+        sys.exit(1)
+
+if __name__ == '__main__':
+    config_path = os.path.join(
+        os.path.expanduser('~'),
+        '.manage_users.conf'
+    )
+    main(sys.argv[1:], config_path)

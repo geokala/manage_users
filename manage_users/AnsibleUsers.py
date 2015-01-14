@@ -156,7 +156,7 @@ class AnsibleUsers(object):
         }
 
         if comment is not None:
-            user['comment'] = comment
+            user_settings['comment'] = comment
 
         self.playbook[0]['tasks'].append({
             'name': 'Manage group for {user}'.format(user=user),
