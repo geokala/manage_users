@@ -215,7 +215,7 @@ class AnsibleUsers(object):
             if 'user' in task.keys() and task['user']['name'] == user:
                 task['user'][attribute] = new_value
                 # We've found the user, we can stop now
-                break
+                return
         # If we don't find the user, complain
         raise NoSuchUserError(user)
 
