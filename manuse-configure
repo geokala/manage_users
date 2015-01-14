@@ -7,8 +7,8 @@ import sys
 
 def main(args, config_path):
     """
-        List users in the configuration management. By default this will show
-        enabled users and hide disabled users.
+        Configure the user management tool for configuration management
+        systems.
 
         Keyword arguments:
         args -- A list of arguments from the command line with the program
@@ -16,7 +16,8 @@ def main(args, config_path):
         config_path -- The path to the manage_users config file.
     """
     parser = argparse.ArgumentParser(
-        description='Show users controlled by this application.',
+        description='Configure user management tool for configuration'
+                    ' management.',
     )
 
     parser.add_argument(
