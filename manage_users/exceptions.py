@@ -28,7 +28,7 @@ class NoSuchUserError(Exception):
             Keyword arguments:
             user -- The name of the user that could not be found.
         """
-        super(DuplicateUserError, self).__init__(
+        super(NoSuchUserError, self).__init__(
             'Could not modify {user} as they do not exist.'.format(
                 user=user
             ),
@@ -49,9 +49,10 @@ class SSHKeyNotFoundError(Exception):
             key_id -- The ID of the key that could not be found.
         """
         message =  'Could not find {key_id} for {user}.'.format(
-            user=user
+            user=user,
+            key_id=key_id,
         )
         message += (' Either the user does not have this many keys, or'
                     ' they do not exist.')
 
-        super(DuplicateUserError, self).__init__(message)
+        super(SSHKeyNotFoundError, self).__init__(message)
