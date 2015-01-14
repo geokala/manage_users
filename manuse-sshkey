@@ -1,0 +1,131 @@
+#! /usr/bin/env python3
+import argparse
+import configparser
+from manage_users import AnsibleUsers, SSHKeyNotFoundError
+import os
+import sys
+
+
+def main(args, config_path):
+    """
+        Add an SSH key to a user, or disable an existing one.
+
+        Keyword arguments:
+        args -- A list of arguments from the command line with the program
+                name removed (sys.argv[1:]).
+        config_path -- The path to the manage_users config file.
+    """
+    parser = argparse.ArgumentParser(
+        description="Modify a user's SSH keys.",
+    )
+
+    parser.add_argument(
+        '-u', '--username',
+        help="The username to modify keys for.",
+        required=True,
+    )
+    parser.add_argument(
+        '-d', '--disable-sshkey',
+        help='Disable one or more SSH keys. Integers will be treated as IDs.'
+             ' The ID can be seen when listing users.'
+             ' If the passed value is not an integer, keys that match will be'
+             ' disabled.',
+        nargs='+',
+    )
+    parser.add_argument(
+        '-e', '--enable-sshkey',
+        help='Enable one or more SSH keys. Integers will be treated as IDs.'
+             ' The ID can be seen when listing users.'
+             ' If the passed value is not an integer, keys that match will be'
+             ' enabled or added.',
+        nargs='+',
+    )
+
+    args = parser.parse_args(args)
+
+    config = configparser.ConfigParser()
+    try:
+        with open(config_path) as config_handle:
+            config.readfp(config_handle)
+    except FileNotFoundError:
+        sys.stderr.write(
+            ('Could not find config file in {config_path}\n'
+             'Please run configuration utility before use:\n').format(
+                config_path=config_path
+            )
+        )
+        sys.exit(1)
+
+    # Find out where the playbook is
+    playbook_path = config.get('ansible', 'playbook_path')
+
+    if playbook_path is None:
+        sys.stderr.write(
+            ('Could not find playbook path in configuration.\n'
+             'Please run configuration utility to set playbook path.\n')
+        )
+        sys.exit(1)
+
+    # Get the base ID or use a default
+    base_id = int(config.get('general', 'base_id')) or 10000
+
+    user_manager = AnsibleUsers(playbook_path=playbook_path,
+                                base_id=base_id)
+    user_manager.load_playbook()
+
+    # Make sure we have a usable value for enabling/disabling keys
+    if args.enable_sshkey is None:
+        enable_sshkeys = []
+    else:
+        enable_sshkeys = args.enable_sshkey
+    if args.disable_sshkey is None:
+        disable_sshkeys = []
+    else:
+        disable_sshkeys = args.disable_sshkey
+
+    user_sshkeys = user_manager.get_users(
+        include_active=True,
+        include_inactive=True
+    )[args.username]['sshkeys']
+
+    for operation in ('enable', 'disable'):
+        if operation == 'enable':
+            keys = enable_sshkeys
+            action = user_manager.enable_sshkey
+        else:
+            keys = disable_sshkeys
+            action = user_manager.disable_sshkey
+
+        for key in keys:
+            not_found = False
+            try:
+                key = int(key)
+                # The list is zero indexed, but we show it as one indexed
+                key -= 1
+            except SSHKeyNotFoundError:
+                not_found = True
+            except ValueError:
+                # This is an SSH key. Try to find it
+                try:
+                    key = user_sshkeys.index(key)
+                except ValueError:
+                    not_found = True
+
+            if not_found:
+                if operation == 'enable':
+                    user_manager.add_sshkey(args.username, key)
+                else:
+                    sys.stderr.write('Key {key} not found.\n'.format(key=key))
+            else:
+                action(args.username, key)
+        disable_sshkeys
+
+    # Save the changes
+    user_manager.save_playbook()
+
+if __name__ == '__main__':
+    config_path = os.path.join(
+        os.path.expanduser('~'),
+        '.manage_users.conf'
+    )
+    main(sys.argv[1:], config_path)
