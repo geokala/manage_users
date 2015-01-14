@@ -73,6 +73,7 @@ def main(args, config_path):
     if args.sshkey is None:
         sshkeys = []
     else:
+        # TODO: Add some checks that this is really an SSH key
         sshkeys = args.sshkey
 
     # We need to get a password- it'll be hashed by the user management lib
