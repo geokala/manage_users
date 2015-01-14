@@ -1,0 +1,123 @@
+#! /usr/bin/env python3
+import argparse
+from collections import OrderedDict
+import configparser
+import json
+from manage_users import AnsibleUsers
+import os
+import sys
+
+
+def main(args, config_path):
+    """
+        List users in the configuration management. By default this will show
+        enabled users and hide disabled users.
+
+        Keyword arguments:
+        args -- A list of arguments from the command line with the program
+                name removed (sys.argv[1:]).
+        config_path -- The path to the manage_users config file.
+    """
+    parser = argparse.ArgumentParser(
+        description='Show users controlled by this application.',
+    )
+
+    parser.add_argument(
+        '-e', '--hide-enabled',
+        help='Hide enabled users from the listing.',
+        action='store_true',
+        default=False,
+    )
+    parser.add_argument(
+        '-d', '--show-disabled',
+        help='Show disabled users in the listing.',
+        action='store_true',
+        default=False,
+    )
+    parser.add_argument(
+        '-j', '--json-output',
+        help='Output as json.',
+        action='store_true',
+        default=False,
+    )
+
+    args = parser.parse_args(args)
+
+    config = configparser.ConfigParser()
+    try:
+        with open(config_path) as config_handle:
+            config.readfp(config_handle)
+    except FileNotFoundError:
+        sys.stderr.write(
+            ('Could not find config file in {config_path}\n'
+             'Please run configuration utility before use:\n').format(
+                config_path=config_path
+            )
+        )
+        sys.exit(1)
+
+    # Find out where the playbook is
+    playbook_path = config.get('ansible', 'playbook_path')
+
+    if playbook_path is None:
+        sys.stderr.write(
+            ('Could not find playbook path in configuration.\n'
+             'Please run configuration utility to set playbook path.\n')
+        )
+        sys.exit(1)
+
+    # Get the base ID or use a default
+    base_id = int(config.get('general', 'base_id')) or 10000
+
+    user_manager = AnsibleUsers(playbook_path=playbook_path,
+                                base_id=base_id)
+    user_manager.load_playbook()
+
+    # Set filtering options
+    include_active = not args.hide_enabled
+    include_inactive = args.show_disabled
+
+    users = user_manager.get_users(include_active=include_active,
+                                   include_inactive=include_inactive)
+
+    # Dictionaries in json aren't technically ordered, but this means that if
+    # other input types are added later then they'll be ordered.
+    # Additionally, it makes the output algorithm below a lot cleaner.
+    #
+    # Output in order of UID (lowest first) for consistency
+    sorted_users = OrderedDict(
+        sorted(users.items(), key=lambda user: user[1]['uid'])
+    )
+
+    if args.json_output:
+        print(json.dumps(sorted_users))
+    else:
+        for user, details in sorted_users.items():
+            print('{user}:'.format(user=user))
+            for detail in ('comment',
+                           'enabled',
+                           'uid',
+                           'groups',
+                           'shell',
+                           'sshkeys'):
+                # Let's process things that aren't sshkeys first, it's simpler
+                if detail in details.keys():
+                    if detail != 'sshkeys':
+                        print('  {detail}: {value}'.format(
+                            detail=detail.capitalize(),
+                            value=details[detail],
+                        ))
+                    else:
+                        print('  SSH keys:')
+                        for index in range(0, len(details['sshkeys'])):
+                            print('    {index}: {key}'.format(
+                                index=index,
+                                key=details['sshkeys'][index],
+                            ))
+
+if __name__ == '__main__':
+    config_path = os.path.join(
+        os.path.expanduser('~'),
+        '.manage_users.conf'
+    )
+    main(sys.argv[1:], config_path)
