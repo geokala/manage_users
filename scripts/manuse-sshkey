@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 import argparse
 import configparser
-from manage_users import FileNotFoundError, SSHKeyNotFoundError
+from manage_users import SSHKeyNotFoundError
 from manage_users.script_helpers import playbook_load_or_prompt_for_create
 import os
 import sys

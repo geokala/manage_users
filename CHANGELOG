@@ -1,0 +1,6 @@
+1.0.1:
+  Bug fixes:
+    - Prompt to create missing ansible playbook rather than crashing
+1.0.0:
+  New features:
+    - Manage users via an ansible playbook.

@@ -16,6 +16,7 @@ class DuplicateUserError(Exception):
             ),
         )
 
+
 class NoSuchUserError(Exception):
     """
         Raised when an attempt is made to operate on a nonexistent user.
@@ -34,6 +35,7 @@ class NoSuchUserError(Exception):
             ),
         )
 
+
 class SSHKeyNotFoundError(Exception):
     """
         Raised when an attempt is made to act on an SSH key for a user where
@@ -48,7 +50,7 @@ class SSHKeyNotFoundError(Exception):
             user -- The name of the user that the key could not be found for.
             key_id -- The ID of the key that could not be found.
         """
-        message =  'Could not find {key_id} for {user}.'.format(
+        message = 'Could not find {key_id} for {user}.'.format(
             user=user,
             key_id=key_id,
         )

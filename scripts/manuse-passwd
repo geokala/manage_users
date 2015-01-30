@@ -2,7 +2,7 @@
 import argparse
 import configparser
 from getpass import getpass
-from manage_users import FileNotFoundError, NoSuchUserError
+from manage_users import NoSuchUserError
 from manage_users.script_helpers import playbook_load_or_prompt_for_create
 import os
 import sys

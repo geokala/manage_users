@@ -1,4 +1,4 @@
-from manage_users import AnsibleUsers, FileNotFoundError
+from manage_users import AnsibleUsers
 import sys
 
 
@@ -18,7 +18,7 @@ def playbook_load_or_prompt_for_create(playbook_path, base_id):
     except FileNotFoundError:
         answer = ''
         while answer.lower() not in ('y', 'n'):
-            answer = raw_input(
+            answer = input(
                 'Playbook not found in {path}.'
                 ' Do you wish to create it (y/n)?'.format(
                     path=playbook_path

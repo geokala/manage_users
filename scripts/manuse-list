@@ -3,7 +3,6 @@ import argparse
 from collections import OrderedDict
 import configparser
 import json
-from manage_users import FileNotFoundError
 from manage_users.script_helpers import playbook_load_or_prompt_for_create
 import os
 import sys
