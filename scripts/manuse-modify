@@ -1,7 +1,8 @@
 #! /usr/bin/env python3
 import argparse
 import configparser
-from manage_users import AnsibleUsers, NoSuchUserError
+from manage_users import FileNotFoundError, NoSuchUserError
+from manage_users.script_helpers import playbook_load_or_prompt_for_create
 import os
 import sys
 
@@ -69,9 +70,10 @@ def main(args, config_path):
     # Get the base ID or use a default
     base_id = int(config.get('general', 'base_id')) or 10000
 
-    user_manager = AnsibleUsers(playbook_path=playbook_path,
-                                base_id=base_id)
-    user_manager.load_playbook()
+    user_manager = playbook_load_or_prompt_for_create(
+        playbook_path=playbook_path,
+        base_id=base_id,
+    )
 
     if args.enable:
         action = user_manager.enable_user
