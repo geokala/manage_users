@@ -38,6 +38,29 @@ class AnsibleUsers(object):
         self.default_shell = default_shell
         self.default_groups = default_groups
 
+    def _determine_defaults_on_load(self):
+        """
+            Get the current defaults from the playbook.
+
+            Intended to be used when the playbook is loading.
+        """
+        tasks = self.playbook[0]['tasks']
+
+        for task in tasks:
+            if task['name'] == 'manage enabled users':
+                default_user = task['user']
+                default_user = dict([
+                    item.split('=')
+                    for item in default_user.split()
+                    if len(item.split('=')) == 2
+                ])
+                for setting, value in default_user.items():
+                    if setting == 'groups':
+                        self.default_groups = value
+                    elif setting == 'shell':
+                        self.default_shell = value
+                return
+
     def load_playbook(self):
         """
             Load the playbook this class is associated with.
@@ -45,6 +68,8 @@ class AnsibleUsers(object):
         with open(self.playbook_path) as playbook_handle:
             data = playbook_handle.read()
         self.playbook = yaml.load(data)
+
+        self._determine_defaults_on_load()
 
         # Update the base ID
         users = self.get_users(include_active=True, include_inactive=True)
