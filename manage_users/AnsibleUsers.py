@@ -19,7 +19,11 @@ class AnsibleUsers(object):
     }
     playbook = None
 
-    def __init__(self, playbook_path='test/example.yml', base_id=10000):
+    def __init__(self,
+                 playbook_path='test/example.yml',
+                 default_shell='/bin/bash',
+                 default_groups='sudo',
+                 base_id=10000):
         """
             Initialise the ansible user management module.
 
@@ -31,6 +35,8 @@ class AnsibleUsers(object):
         """
         self.playbook_path = playbook_path
         self.next_id = base_id
+        self.default_shell = default_shell
+        self.default_groups = default_groups
 
     def load_playbook(self):
         """
@@ -77,16 +83,18 @@ class AnsibleUsers(object):
                 },
                 {
                     'name': 'manage enabled users',
-                    'user': 'name="{{item.username}}" '
-                            'group="{{item.username}}" '
-                            'uid="{{item.uid}}" '
+                    'user': 'name="{{{{item.username}}}}" '
+                            'group="{{{{item.username}}}}" '
+                            'uid="{{{{item.uid}}}}" '
                             'state=present '
-                            'groups=sudo '
-                            'password="{{item.password}}" '
-                            'shell=/bin/bash '
-                            '{% if item.comment is defined %}'
-                            '"comment={{item.comment}}"'
-                            '{% endif %}',
+                            'groups={groups} '
+                            'password="{{{{item.password}}}}" '
+                            'shell={shell} '
+                            '{{% if item.comment is defined %}}'
+                            '"comment={{{{item.comment}}}}"'
+                            '{{% endif %}}'.format(
+                                groups=self.default_groups,
+                                shell=self.default_shell),
                     'with_items': 'enabled_users',
                 },
                 {
@@ -178,10 +186,6 @@ class AnsibleUsers(object):
             include_active -- Include active users (default: True)
             include_inactive -- Include inactive users (default: True)
         """
-        # TODO: Support changing of default shell and groups
-        default_shell = '/bin/bash'
-        default_groups = 'sudo'
-
         # Prepare the user list
         users = defaultdict(dict)
 
@@ -192,8 +196,8 @@ class AnsibleUsers(object):
                     'enabled': True,
                     'uid': user['uid'],
                     'password': user['password'],
-                    'shell': default_shell,
-                    'groups': default_groups,
+                    'shell': self.default_shell,
+                    'groups': self.default_groups,
                     'sshkeys': self._form_sshkey_dict(user),
                 }
 
@@ -204,8 +208,8 @@ class AnsibleUsers(object):
                     'enabled': False,
                     'uid': user['uid'],
                     'password': user['password'],
-                    'shell': default_shell,
-                    'groups': default_groups,
+                    'shell': self.default_shell,
+                    'groups': self.default_groups,
                     'sshkeys': self._form_sshkey_dict(user),
                 }
 
