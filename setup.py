@@ -4,7 +4,7 @@ import os
 
 setup(
     name='manage_users',
-    version='2.0.0',
+    version='2.0.1',
     description='Utility for managing users via configuration management'
                 ' systems. Currently supports ansible only.',
     author='geokala',

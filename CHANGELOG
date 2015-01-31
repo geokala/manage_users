@@ -1,3 +1,7 @@
+2.0.1:
+  Bug fixes:
+    - Correctly determine default shell and groups.
+    - Don't offer to create missing playbook when listing, as we won't actually create it.
 2.0.0:
   New features:
     - Migrate to use ansible variables to simplify ansible playbooks.
