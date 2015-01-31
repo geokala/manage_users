@@ -83,7 +83,10 @@ class AnsibleUsers(object):
                             'state=present '
                             'groups=sudo '
                             'password="{{item.password}}" '
-                            'shell=/bin/bash',
+                            'shell=/bin/bash '
+                            '{% if item.comment is defined %}'
+                            '"comment={{item.comment}}"'
+                            '{% endif %}',
                     'with_items': 'enabled_users',
                 },
                 {
@@ -154,6 +157,18 @@ class AnsibleUsers(object):
                 }
         return keys
 
+    def _get_userlist(self, enabled=True):
+        """
+            Get the enabled or disabled user list.
+        """
+        if enabled:
+            search_string = 'enabled_users'
+        else:
+            search_string = 'disabled_users'
+        for var in self.playbook[0]['vars']:
+            if search_string in var.keys():
+                return var[search_string]
+
     def get_users(self, include_active=True, include_inactive=True):
         """
             Return a dict indexed on the users in the playbook, with details
@@ -170,14 +185,8 @@ class AnsibleUsers(object):
         # Prepare the user list
         users = defaultdict(dict)
 
-        # Get the vars
-        playbook_vars = self.playbook[0]['vars']
-
         if include_active:
-            enabled_users = []
-            for var in playbook_vars:
-                if 'enabled_users' in var.keys():
-                    enabled_users = var['enabled_users']
+            enabled_users = self._get_userlist(enabled=True)
             for user in enabled_users:
                 users[user['username']] = {
                     'enabled': True,
@@ -189,10 +198,7 @@ class AnsibleUsers(object):
                 }
 
         if include_inactive:
-            disabled_users = []
-            for var in playbook_vars:
-                if 'disabled_users' in var.keys():
-                    disabled_users = var['disabled_users']
+            disabled_users = self._get_userlist(enabled=False)
             for user in disabled_users:
                 users[user['username']] = {
                     'enabled': False,
@@ -235,33 +241,18 @@ class AnsibleUsers(object):
         if user in self.get_users().keys():
             raise DuplicateUserError(user)
 
-        group = {
-            'name': user,
-            'gid': self.next_id,
-            'state': 'present',
-        }
-
         user_settings = {
-            'name': user,
+            'username': user,
             'password': self._hash_password(password),
-            'group': user,
             'uid': self.next_id,
-            'shell': '/bin/bash',
-            'state': 'present',
-            'groups': 'sudo',
         }
 
         if comment is not None:
             user_settings['comment'] = comment
 
-        self.playbook[0]['tasks'].append({
-            'name': 'Manage group for {user}'.format(user=user),
-            'group': group,
-        })
-        self.playbook[0]['tasks'].append({
-            'name': 'Manage user for {user}'.format(user=user),
-            'user': user_settings,
-        })
+        self._get_userlist(enabled=True).append(
+            user_settings
+        )
 
         for key in sshkeys:
             self.add_sshkey(user, key)
@@ -280,23 +271,30 @@ class AnsibleUsers(object):
 
         # TODO: Sanity checking- make sure the key is valid
 
+        key = key.split(maxsplit=2)
+        if len(key) == 1:
+            # TODO: Proper failure to be raised
+            raise ValueError
+        elif len(key) == 2:
+            key_id = key.pop()
+        else:
+            key_id = str(len(users[user].get('sshkeys', [])) + 1)
+
+        key_type = key[0]
+        key = key[1]
+
         authorized_key = {
-            'user': user,
+            'type': key_type,
             'key': key,
-            'state': 'present',
+            'id': key_id,
         }
 
-        # Differentiate key management task names based on the number of keys
-        # registered to this user
-        key_count = len(users[user].get('sshkeys', [])) + 1
+        users = self._get_userlist(enabled=True)
 
-        self.playbook[0]['tasks'].append({
-            'name': 'Manage sshkey {count} for user {user}'.format(
-                user=user,
-                count=key_count,
-            ),
-            'authorized_key': authorized_key,
-        })
+        for user in users:
+            if user['username'] == user:
+                user['sshkey_enabled'].append(authorized_key)
+                break
 
     def _modify_user_attribute(self, user, attribute, new_value):
         """
