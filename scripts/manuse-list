@@ -111,16 +111,23 @@ def main(args, config_path):
                         ))
                     else:
                         print('  SSH keys:')
-                        for index in range(0, len(details['sshkeys'])):
-                            if details['sshkeys'][index]['enabled']:
+                        key_ids = list(details['sshkeys'].keys())
+                        key_ids.sort()
+                        for key_id in key_ids:
+                            key = details['sshkeys'][key_id]
+                            if key['enabled']:
                                 state_string = ''
                             else:
                                 state_string = ' <DISABLED>'
-                            print('    {index}{state}: {key}'.format(
-                                index=index + 1,
-                                state=state_string,
-                                key=details['sshkeys'][index]['key'],
-                            ))
+                            print(
+                                '    {key_id}{state}: '
+                                '{key_type} {key}'.format(
+                                    key_id=key_id,
+                                    state=state_string,
+                                    key_type=key['type'],
+                                    key=key['key'],
+                                )
+                            )
 
 if __name__ == '__main__':
     config_path = os.path.join(

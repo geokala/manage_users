@@ -65,7 +65,94 @@ class AnsibleUsers(object):
                      This should be a comma separated string.
                      (default: all)
         """
-        self.playbook = [{'hosts': hosts, 'tasks': []}]
+        self.playbook = [{
+            'hosts': hosts,
+            'tasks': [
+                {
+                    'name': 'manage enabled user groups',
+                    'group': 'name="{{item.username}}" '
+                             'gid="{{item.uid}}" '
+                             'state=present',
+                    'with_items': 'enabled_users',
+                },
+                {
+                    'name': 'manage enabled users',
+                    'user': 'name="{{item.username}}" '
+                            'group="{{item.username}}" '
+                            'uid="{{item.uid}}" '
+                            'state=present '
+                            'groups=sudo '
+                            'password="{{item.password}}" '
+                            'shell=/bin/bash',
+                    'with_items': 'enabled_users',
+                },
+                {
+                    'name': 'manage enabled ssh keys',
+                    'authorized_key': 'key="{{item.1.type}} '
+                                      '{{item.1.key}} '
+                                      '{{item.1.id}}" '
+                                      'user="{{item.0.username}}" '
+                                      'state=present',
+                    'with_subelements': [
+                        'enabled_users',
+                        'sshkey_enabled',
+                    ],
+                },
+                {
+                    'name': 'manage disabled ssh keys',
+                    'authorized_key': 'key="{{item.1.type}} '
+                                      '{{item.1.key}} '
+                                      '{{item.1.id}}" '
+                                      'user="{{item.0.username}}" '
+                                      'state=absent',
+                    'with_subelements': [
+                        'enabled_users',
+                        'sshkey_disabled',
+                    ],
+                },
+                {
+                    'name': 'manage disabled users',
+                    'user': 'name="{{item.username}}" '
+                            'uid="{{item.uid}}" '
+                            'state=present',
+                    'with_items': 'disabled_users',
+                },
+                {
+                    'name': 'manage disabled user groups',
+                    'group': 'name="{{item.username}}" '
+                             'gid="{{item.uid}}" '
+                             'state=absent',
+                    'with_items': 'disabled_users',
+                },
+            ],
+            'vars': [
+                {
+                    'enabled_users': [],
+                },
+                {
+                    'disabled_users': [],
+                },
+            ],
+        }]
+
+    def _form_sshkey_dict(self, user):
+        """
+            Take a user object (containing sshkey_enabled and sshkey_disabled
+            keys), and return a dict with the sshkeys keyed on ID.
+
+            Keyword arguments:
+            user -- A user from the ansible playbook.
+        """
+        keys = {}
+        for state in ('enabled', 'disabled'):
+            for sshkey in user['sshkey_{state}'.format(state=state)]:
+                keys[sshkey['id']] = {
+                    'type': sshkey['type'],
+                    'key': sshkey['key'],
+                    'id': sshkey['id'],
+                    'enabled': True if state == 'enabled' else False,
+                }
+        return keys
 
     def get_users(self, include_active=True, include_inactive=True):
         """
@@ -76,36 +163,45 @@ class AnsibleUsers(object):
             include_active -- Include active users (default: True)
             include_inactive -- Include inactive users (default: True)
         """
-        playbook_tasks = self.playbook[0]['tasks']
+        # TODO: Support changing of default shell and groups
+        default_shell = '/bin/bash'
+        default_groups = 'sudo'
 
-        # Get all users
+        # Prepare the user list
         users = defaultdict(dict)
-        for task in playbook_tasks:
-            if 'user' in task.keys():
-                user = task['user']
 
-                # Only add if we're not filtering
-                user_active = self.state_mapping[user['state']]
-                if user_active and include_active or \
-                   (not user_active) and include_inactive:
+        # Get the vars
+        playbook_vars = self.playbook[0]['vars']
 
-                    users[user['name']].update(user)
-                    users[user['name']]['enabled'] = self.state_mapping[
-                        users[user['name']]['state']
-                    ]
-            elif 'authorized_key' in task.keys():
-                key_details = task['authorized_key']
+        if include_active:
+            enabled_users = []
+            for var in playbook_vars:
+                if 'enabled_users' in var.keys():
+                    enabled_users = var['enabled_users']
+            for user in enabled_users:
+                users[user['username']] = {
+                    'enabled': True,
+                    'uid': user['uid'],
+                    'password': user['password'],
+                    'shell': default_shell,
+                    'groups': default_groups,
+                    'sshkeys': self._form_sshkey_dict(user),
+                }
 
-                # Don't add the key if the user was filtered
-                if key_details['user'] not in users:
-                    continue
-
-                if 'sshkeys' not in users[key_details['user']].keys():
-                    users[user['name']]['sshkeys'] = []
-                users[user['name']]['sshkeys'].append({
-                    'key': key_details['key'],
-                    'enabled': self.state_mapping[key_details['state']],
-                })
+        if include_inactive:
+            disabled_users = []
+            for var in playbook_vars:
+                if 'disabled_users' in var.keys():
+                    disabled_users = var['disabled_users']
+            for user in disabled_users:
+                users[user['username']] = {
+                    'enabled': False,
+                    'uid': user['uid'],
+                    'password': user['password'],
+                    'shell': default_shell,
+                    'groups': default_groups,
+                    'sshkeys': self._form_sshkey_dict(user),
+                }
 
         return users
 
