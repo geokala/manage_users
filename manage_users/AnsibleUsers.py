@@ -245,6 +245,8 @@ class AnsibleUsers(object):
             'username': user,
             'password': self._hash_password(password),
             'uid': self.next_id,
+            'sshkey_enabled': [],
+            'sshkey_disabled': [],
         }
 
         if comment is not None:
@@ -276,9 +278,9 @@ class AnsibleUsers(object):
             # TODO: Proper failure to be raised
             raise ValueError
         elif len(key) == 2:
-            key_id = key.pop()
-        else:
             key_id = str(len(users[user].get('sshkeys', [])) + 1)
+        else:
+            key_id = key.pop()
 
         key_type = key[0]
         key = key[1]
@@ -291,10 +293,10 @@ class AnsibleUsers(object):
 
         users = self._get_userlist(enabled=True)
 
-        for user in users:
-            if user['username'] == user:
-                user['sshkey_enabled'].append(authorized_key)
-                break
+        for candidate_user in users:
+            if candidate_user['username'] == user:
+                candidate_user['sshkey_enabled'].append(authorized_key)
+                return
 
     def _modify_user_attribute(self, user, attribute, new_value):
         """
@@ -305,9 +307,12 @@ class AnsibleUsers(object):
             attribute -- The name of the attribute to change.
             new_value -- The new value of the attribute.
         """
-        for task in self.playbook[0]['tasks']:
-            if 'user' in task.keys() and task['user']['name'] == user:
-                task['user'][attribute] = new_value
+        users = self._get_userlist(enabled=True)
+        users.extend(self._get_userlist(enabled=False))
+
+        for candidate_user in users:
+            if candidate_user['username'] == user:
+                candidate_user[attribute] = new_value
                 # We've found the user, we can stop now
                 return
         # If we don't find the user, complain
@@ -336,11 +341,16 @@ class AnsibleUsers(object):
             Keyword arguments:
             user -- The user to enable.
         """
-        self._modify_user_attribute(
-            user=user,
-            attribute='state',
-            new_value='present',
-        )
+        enabled_users = self._get_userlist(enabled=True)
+        disabled_users = self._get_userlist(enabled=False)
+
+        for candidate_user in disabled_users:
+            if candidate_user['username'] == user:
+                enabled_users.append(candidate_user)
+                disabled_users.remove(candidate_user)
+                return
+        # If we don't find the user, complain
+        raise NoSuchUserError(user)
 
     def disable_user(self, user):
         """
@@ -351,11 +361,16 @@ class AnsibleUsers(object):
             Keyword arguments:
             user -- The user to disable.
         """
-        self._modify_user_attribute(
-            user=user,
-            attribute='state',
-            new_value='absent',
-        )
+        enabled_users = self._get_userlist(enabled=True)
+        disabled_users = self._get_userlist(enabled=False)
+
+        for candidate_user in enabled_users:
+            if candidate_user['username'] == user:
+                disabled_users.append(candidate_user)
+                enabled_users.remove(candidate_user)
+                return
+        # If we don't find the user, complain
+        raise NoSuchUserError(user)
 
     def _modify_sshkey_attribute(self, user, target_key_id,
                                  attribute, new_value):
@@ -368,17 +383,18 @@ class AnsibleUsers(object):
             attribute -- The name of the attribute to change.
             new_value -- The new value of the attribute.
         """
-        for task in self.playbook[0]['tasks']:
-            if 'authorized_key' in task.keys() and \
-               task['authorized_key']['user'] == user:
-                # We found a key for this user- check it's the right one
-                # The task name must be in the form:
-                # 'Manage sshkey {count} for user {user}'
-                this_id = int(task['name'][14:].split()[0])
-                if this_id == target_key_id:
-                    task['authorized_key'][attribute] = new_value
-                    # We've found the key, we can stop now
-                    return
+        users = self._get_userlist(enabled=True)
+        users.extend(self._get_userlist(enabled=False))
+
+        for candidate_user in users:
+            if candidate_user['username'] == user:
+                keys = candidate_user['sshkey_enabled']
+                keys.extend(candidate_user['sshkey_disabled'])
+                for key in keys:
+                    if key['id'] == target_key_id:
+                        key[attribute] = new_value
+                        # We've found the key, we can stop now
+                        return
         raise SSHKeyNotFoundError(user, target_key_id)
 
     def enable_sshkey(self, user, key_id):
@@ -390,12 +406,19 @@ class AnsibleUsers(object):
             user -- The name of the user whose SSH key should be affected.
             key_id -- The ID of the key to be affected.
         """
-        self._modify_sshkey_attribute(
-            user=user,
-            target_key_id=key_id,
-            attribute='state',
-            new_value='present',
-        )
+        users = self._get_userlist(enabled=True)
+        users.extend(self._get_userlist(enabled=False))
+
+        for candidate_user in users:
+            if candidate_user['username'] == user:
+                enabled_keys = candidate_user['sshkey_enabled']
+                disabled_keys = candidate_user['sshkey_disabled']
+                for key in disabled_keys:
+                    if key['id'] == key_id:
+                        enabled_keys.append(key)
+                        disabled_keys.remove(key)
+                        return
+        raise SSHKeyNotFoundError(user, key_id)
 
     def disable_sshkey(self, user, key_id):
         """
@@ -406,9 +429,16 @@ class AnsibleUsers(object):
             user -- The name of the user whose SSH key should be affected.
             key_id -- The ID of the key to be affected.
         """
-        self._modify_sshkey_attribute(
-            user=user,
-            target_key_id=key_id,
-            attribute='state',
-            new_value='absent',
-        )
+        users = self._get_userlist(enabled=True)
+        users.extend(self._get_userlist(enabled=False))
+
+        for candidate_user in users:
+            if candidate_user['username'] == user:
+                enabled_keys = candidate_user['sshkey_enabled']
+                disabled_keys = candidate_user['sshkey_disabled']
+                for key in enabled_keys:
+                    if key['id'] == key_id:
+                        disabled_keys.append(key)
+                        enabled_keys.remove(key)
+                        return
+        raise SSHKeyNotFoundError(user, key_id)
