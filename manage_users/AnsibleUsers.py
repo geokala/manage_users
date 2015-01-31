@@ -418,6 +418,10 @@ class AnsibleUsers(object):
                         enabled_keys.append(key)
                         disabled_keys.remove(key)
                         return
+                for key in enabled_keys:
+                    if key['id'] == key_id:
+                        # The key exists, but we don't need to do anything
+                        return
         raise SSHKeyNotFoundError(user, key_id)
 
     def disable_sshkey(self, user, key_id):
@@ -440,5 +444,9 @@ class AnsibleUsers(object):
                     if key['id'] == key_id:
                         disabled_keys.append(key)
                         enabled_keys.remove(key)
+                        return
+                for key in disabled_keys:
+                    if key['id'] == key_id:
+                        # The key exists, but we don't need to do anything
                         return
         raise SSHKeyNotFoundError(user, key_id)

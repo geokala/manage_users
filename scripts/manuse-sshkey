@@ -86,43 +86,21 @@ def main(args, config_path):
     else:
         disable_sshkeys = args.disable_sshkey
 
-    user_sshkeys = user_manager.get_users(
-        include_active=True,
-        include_inactive=True
-    )[args.username]['sshkeys']
+    user = args.username
 
-    for operation in ('enable', 'disable'):
-        if operation == 'enable':
-            keys = enable_sshkeys
-            action = user_manager.enable_sshkey
-        else:
-            keys = disable_sshkeys
-            action = user_manager.disable_sshkey
+    for key in enable_sshkeys:
+        try:
+            user_manager.enable_sshkey(user, key)
+        except SSHKeyNotFoundError:
+            sys.stderr.write('Could not enable {key}- '
+                             'not found.\n'.format(key=key))
 
-        for key in keys:
-            found = True
-            try:
-                key = int(key)
-            except ValueError:
-                # This is an SSH key. Try to find it
-                found = False
-                for possible_key in range(0, len(user_sshkeys)):
-                    if user_sshkeys[possible_key]['key'] == key:
-                        # SSH key indexes are one indexed effectively
-                        key = possible_key + 1
-                        found = True
-
-            if not found and operation == 'enable':
-                user_manager.add_sshkey(args.username, key)
-                found = True
-            elif found:
-                try:
-                    action(args.username, key)
-                except SSHKeyNotFoundError:
-                    found = False
-
-            if not found:
-                sys.stderr.write('Key {key} not found.\n'.format(key=key))
+    for key in disable_sshkeys:
+        try:
+            user_manager.disable_sshkey(user, key)
+        except SSHKeyNotFoundError:
+            sys.stderr.write('Could not disable {key}- '
+                             'not found.\n'.format(key=key))
 
     # Save the changes
     user_manager.save_playbook()
