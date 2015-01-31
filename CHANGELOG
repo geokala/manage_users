@@ -1,3 +1,6 @@
+2.0.0:
+  New features:
+    - Migrate to use ansible variables to simplify ansible playbooks.
 1.0.1:
   Bug fixes:
     - Prompt to create missing ansible playbook rather than crashing

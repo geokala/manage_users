@@ -7,7 +7,7 @@ from manage_users.exceptions import (  # noqa
 )
 
 __author__ = 'geokala- https://github.com/geokala'
-__version__ = '1.0.0'
+__version__ = '2.0.0'
 """
     This module is designed to facilitate management of users through a
     configuration management system when centralised account management (such
