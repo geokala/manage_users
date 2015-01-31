@@ -3,7 +3,7 @@ import argparse
 from collections import OrderedDict
 import configparser
 import json
-from manage_users.script_helpers import playbook_load_or_prompt_for_create
+from manage_users import AnsibleUsers
 import os
 import sys
 
@@ -70,10 +70,16 @@ def main(args, config_path):
     # Get the base ID or use a default
     base_id = int(config.get('general', 'base_id')) or 10000
 
-    user_manager = playbook_load_or_prompt_for_create(
+    user_manager = AnsibleUsers(
         playbook_path=playbook_path,
         base_id=base_id,
     )
+    try:
+        user_manager.load_playbook()
+    except FileNotFoundError:
+        sys.stderr.write('Playbook does not exist.\n'
+                         'No users to list.\n')
+        sys.exit()
 
     # Set filtering options
     include_active = not args.hide_enabled
